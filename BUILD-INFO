@@ -1,0 +1,18 @@
+# LambLisp release provenance
+env:            esp32s3-aitrip-480x480
+git_commit:     f8195bfab603d075591940795a4aa86e181a7ecf
+git_describe:   fs-esp32s3-n8r2-00-20260926_184008-205-gf8195bfa
+git_branch:     HEAD
+git_origin:     https://github.com/wawhite3/Lamb-v01.git
+source_host:    fisher (git identity taken from the SOURCE host; this package was compiled on jetson-orin-nano)
+tree_state:     clean -- this binary is reproducible from the commit above
+pushed_to_origin: 3062 commit(s) ahead of origin/master
+build_utc:      2026-09-28 21:16:28 UTC
+build_host:     jetson-orin-nano
+build_stamp:    W3_SYSTEM_VERSION "1.01.1790625321"
+feature_flags:  -DLL_BOARD_NAME='"esp32s3-aitrip-480x480"' -DLL_ESP_ARDUINO=1 -DLL_BIGNUM=1 -DLL_COMMONIO=1 -DLL_COMPLEX=1 -DLL_I2C=1 -DLL_LITTLEFS=1 -DLL_LVGL=1 -DLL_PANEL_ST7701_AITRIP=1 -DLL_RATIONAL=1 -DLL_WIFI=1 -DLL_WIRE=1 -DLL_ESP32=1 -DLL_XTENSA=1 -DLL_ESP32S3=1 -DLL_ESP32S3_N16R8=1 
+toolchain:      gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+manual_source:  /home/sir/src/Lamb-v01/doc/LambLisp.pdf
+manual_built_utc: 2026-09-28 00:57:29 UTC
+demo_source:    .pio/artifacts/wasm32_browser/demo
+demo_built_utc: 2026-09-28 19:24:40 UTC

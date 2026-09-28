@@ -1,0 +1,121 @@
+{
+  "_comment": "AITRIP ESP32-S3 4.0 inch 480x480 RGB panel board -- N16R8 (16 MB quad flash, 8 MB embedded PSRAM).  One of [P231]'s two target panels; the OTHER kind: this is a SCAN panel (16-bit parallel RGB, the hardware reads a framebuffer forever) where the Waveshare AMOLED is a PUSH panel (QSPI, you write pixels when something changes).  See P231 E9/E10 -- they differ in what a frame update IS, not in which controller they use. || EVERY FIGURE HERE IS MEASURED, NOT READ OFF THE LISTING.  `esptool chip-id` on 2026-09-21: 'ESP32-S3 (QFN56) (revision v0.2)', 'Wi-Fi, BT 5 (LE), Dual Core + LP Core, 240MHz, Embedded PSRAM 8MB (AP_3v3)', crystal 40MHz, MAC ac:27:6e:a4:b5:48.  `esptool flash-id`: 'Detected flash size: 16MB', 'Flash type set in eFuse: quad (4 data lines)', 'Flash voltage set by eFuse: 3.3V', manufacturer 68 device 4018.  The product listing said N16R8 and the part agrees -- but [P231] records the C5 that 'arrived labelled N8R4 and measured N8R8', so it was checked rather than believed. || WHY qio_opi.  Flash is QUAD by eFuse, so flash_mode is qio.  The 8 MB embedded PSRAM is modelled on ll_board-esp32s3-eye, the other 8 MB-PSRAM S3 in this tree, which uses qio_opi.  IF THIS IS WRONG THE SYMPTOM IS A BOOT LOOP, NOT A CONFIG ERROR: an opi setting on a quad PSRAM part fails at PSRAM INIT and the board resets forever (the warning is in CLAUDE.md and in ll_board-esp32c5-n8r8.json, which is the quad case).  If this board boot-loops on its first flash, try memory_type qio_qspi BEFORE suspecting the firmware. || IDENTITY: this board has a CH340 bridge (1a86:7523) and CH340s expose NO serial number, so usbenum CANNOT identify it -- it resolves by USB port, which is [B548].  It was discovered because it was plugged into the port the Freenove WROVER had used and inherited that board's name; a flash addressed to Freenove-ESP32-WROVER would have written a classic-ESP32 image to this S3.  The MAC above is the chip's, read over esptool, and is the only reliable identifier this board has.",
+  "build": {
+    "arduino": {
+      "memory_type": "qio_opi"
+    },
+    "core": "esp32",
+    "extra_flags": [
+      "-DBOARD_HAS_PSRAM",
+      "-DARDUINO_ESP32S3_DEV"
+    ],
+    "f_cpu": "240000000L",
+    "f_flash": "80000000L",
+    "flash_mode": "qio",
+    "hwids": [
+      [
+        "0x1A86",
+        "0x7523"
+      ]
+    ],
+    "mcu": "esp32s3",
+    "variant": "esp32s3"
+  },
+  "connectivity": [
+    "wifi",
+    "bluetooth"
+  ],
+  "debug": {
+    "openocd_target": "esp32s3.cfg"
+  },
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
+  "name": "AITRIP ESP32-S3 4.0in 480x480 RGB panel (N16R8, 16MB flash / 8MB PSRAM)",
+  "upload": {
+    "flash_size": "16MB",
+    "maximum_ram_size": 327680,
+    "maximum_size": 16777216,
+    "require_upload_port": true,
+    "speed": 460800
+  },
+  "url": "https://www.espressif.com/en/products/socs/esp32-s3",
+  "vendor": "AITRIP",
+  "_identified_as": "Re-badged GUITION / Jingcai ESP32-4848S040 (vendor model ESP32-4848S040C_I_Y_3), also sold as Sunton ESP32-4848S040.  ~90% confidence, 2026-09-21.  The fingerprint that settles it is STRUCTURAL: this design CANNOT have native USB, because GPIO19 (USB D-) is the touch SDA and GPIO20 (USB D+) is an RGB data line -- which is exactly why it carries a CH340 and therefore why [B548] applies to it.  The vendor's own recommended config is OPI PSRAM + QIO flash + 16MB, which independently confirms the qio_opi chosen here from the measured eFuse readout.  VARIANT NOT CONFIRMED: this board ships either as a plain dev board with an NS4168 I2S speaker amp on GPIO 40/1/2, or as a wall panel with three relays on those same pads.  Nothing else differs.  Check the physical board before driving those pins.",
+  "_panel": {
+    "controller": "ST7701S -- needs BOTH paths: a 3-wire (9-bit) SPI INIT SEQUENCE, then pixel data over the ESP32-S3 LCD_CAM RGB peripheral.  [P231] Part E called this a pure SCAN panel; it is SCAN PLUS AN INIT HANDSHAKE on a bus that blit() never touches, which the LL_Panel `init` hook must own.",
+    "resolution": "480x480, 16-bit RGB565",
+    "DE": 18,
+    "VSYNC": 17,
+    "HSYNC": 16,
+    "PCLK": 21,
+    "backlight": 38,
+    "data_bits_0_4": [
+      4,
+      5,
+      6,
+      7,
+      15
+    ],
+    "data_bits_5_10": [
+      8,
+      20,
+      3,
+      46,
+      9,
+      10
+    ],
+    "data_bits_11_15": [
+      11,
+      12,
+      13,
+      14,
+      0
+    ],
+    "init_spi_cs": 39,
+    "init_spi_sck": 48,
+    "init_spi_mosi": 47,
+    "reset": "RC POWER-ON RESET -- NOT A GPIO, AND NOT SOFTWARE-RESETTABLE.  Corrected 2026-09-21 from the MANUFACTURER'S SCHEMATIC (vendor/5-IO_pin_distribution/schematic_sheet2_*.png); this field previously said 'none -- reset happens inside the 3-wire SPI init sequence', which was a guess dressed as a fact.  Panel connector LCD1 pin 6 (RST) is driven by R16 (10k to 3V3) with C21/C22 -- a passive power-on reset.  CONSEQUENCE, and it shapes driver bring-up: if an init sequence leaves the ST7701 wedged, the ONLY recovery is REMOVING POWER.  A reboot does not do it and neither does re-running init, because the module's EN/RST resets the ESP32 while the panel's RC network stays charged.  So 'flash, observe, adjust, re-flash' is not a valid iteration loop for the init handshake -- power must be cycled between attempts.  TP-RST on the touch FPC is the SAME net, so the GT911 inherits this.",
+    "colour_order_note": "SETTLED 2026-09-21 by the MANUFACTURER's own pin table -- this previously read \"sources disagree whether GPIO 4,5,6,7,15 are the RED or BLUE group\".  They are BLUE.  Jingcai's 5-IO_pin_distribution/4.0 inches IO pin distribution.xlsx labels every data line: IO4/5/6/7/15 = DB1..DB5 (B), IO8/20/3/46/9/10 = DB6..DB11 (G), IO11/12/13/14/0 = DB13..DB17 (R).  The bus order recorded above was already correct; only the colour LABEL was open, and it is now closed by the vendor rather than by inference.  || WHY THE DB NUMBERS MATTER MORE THAN THE COLOUR: DB0 and DB12 are ABSENT from the vendor table.  That is not an omission -- it is an RGB666 (18-bit) panel wired as RGB565, with the least-significant bit of blue and of red left unconnected.  So the panel is 5-6-5 by WIRING, not by driver configuration, and a driver told to emit RGB666 will shift every channel by one bit.  If colours still come out inverted after this, it is the panel's BGR bit, a driver-side convention -- do NOT re-derive the pin list."
+  },
+  "_touch": {
+    "controller": "GT911",
+    "sda": 19,
+    "scl": 45,
+    "i2c_address": "0x5D",
+    "int": "NOT CONNECTED",
+    "rst": "NOT CONNECTED",
+    "note": "INT and RST are unwired, so the address must be HARD-CODED to 0x5D.  Some GT911 drivers toggle RST to select 0x5D vs 0x14 and will fail here.",
+    "address_note": "0x5D IS STRUCTURAL, NOT A DEFAULT -- schematic-confirmed 2026-09-21.  The GT911 samples INT at the release of reset to pick 0x5D vs 0x14.  Here TP_INT reaches the panel connector but lands on NO GPIO, and reset is the RC network above, so the part can only ever present 0x5D.  Hard-code it.  A driver that toggles RST to select the address cannot work on this board and cannot be made to -- neither line is drivable."
+  },
+  "_sdcard": {
+    "mode": "SPI",
+    "cs": 42,
+    "clk": 48,
+    "mosi": 47,
+    "miso": 41,
+    "note": "CLK and MOSI are SHARED WITH THE ST7701S INIT SPI.  Finish panel init before mounting the card, or share the bus with LCD_CS(39) deasserted; projects report needing DMA disabled when sharing.",
+    "miso_note": "IO41 IS TF1 PIN 7 = DAT0, WHICH IS MISO.  The vendor's own xlsx labels it 'TF(D1)' and that is WRONG -- D1 is pin 8 and is unconnected.  The schematic (sheet 1, connector TF1) wins over the spreadsheet: the xlsx is a summary, the schematic is the design.  Full mapping: IO42->pin2 CD/DAT3 (CS), IO47->pin3 CMD (MOSI), IO48->pin5 CLK, IO41->pin7 DAT0 (MISO)."
+  },
+  "_other": {
+    "uart_tx": 43,
+    "uart_rx": 44,
+    "audio_or_relays": "GPIO 40/1/2 -- NS4168 I2S amp (DIN/BCLK/LRCLK) on the dev variant, three relays on the wall-panel variant",
+    "boot_button": "GPIO0 -- ALSO an RGB data line",
+    "free_gpio": "effectively ZERO after panel + touch + SD",
+    "battery": "IP5306 charger circuit present in the parts list; population on this unit UNCONFIRMED",
+    "audio_relay_note": "ONE BOARD WITH 0-OHM JUMPERS -- NOT TWO SKUs.  Corrected 2026-09-21; we had recorded this as 'variant-dependent, check the board', which named no checkable thing.  Operating_instructions.txt plus schematic sheet 2 give the designators: IO40 -> R25 relay1 | R21 DIN; IO2 -> R26 relay2 | R22 LRCLK; IO1 -> R27 relay3 | R23 BCLK.  As shipped R25/R26/R27 are fitted, so the pins drive RELAYS; moving them to R21/R22/R23 switches the same pins to I2S audio.  The NS4168 amp and its JST output are fitted either way -- only the jumpers decide what reaches them.  THE CHECK IS 'which of R21-R23 / R25-R27 are populated', not 'which variant is this'.",
+    "undocumented_by_pin_table": "From the schematic, absent from the pin spreadsheet entirely: (1) LITHIUM BATTERY CHARGING -- U1 charger, 3 status LEDs, BAT+/BAT- on a JST_1.25_2P, power switch SW1, rail VOUT-BAT; the backlight boost AND the audio amp run from VOUT-BAT rather than 3V3, so both survive on battery.  (2) AUTO-RESET -- CH340C DTR/RTS drive T1/T2 onto IO0 and RST, which is why esptool enters the bootloader without touching the buttons.  (3) BACKLIGHT IS A BOOST REGULATOR (U5), not a GPIO-driven LED: IO38 is BL_CTR into its feedback node, so brightness is NOT linear in PWM duty.  (4) P2 debug header carries U0RXD/U0TXD/IO9/RST/GND/3V3 -- and IO9 is also RGB data line DB10, so anything on that header drives a green data line.  The IO9 label was read off a raster schematic and is the one net worth confirming against the physical board."
+  },
+  "_docs": [
+    "https://github.com/esp-arduino-libs/ESP32_Display_Panel/blob/master/docs/board/board_jingcai.md",
+    "https://devices.esphome.io/devices/guition-esp32-s3-4848s040/",
+    "https://homeding.github.io/boards/esp32s3/panel-4848S040.htm",
+    "https://github.com/NorthernMan54/ESP32-4848S040",
+    "https://github.com/FigueiredoStable/LovyanGFX-GUITION-ESP32-4848S040",
+    "https://alaltitov.github.io/Guition-ESP32-S3-4848S040-DOCS/",
+    "http://pan.jczn1688.com/pd/1/ESP32 module/4.0inch_ESP32-4848S040.zip"
+  ],
+  "_provenance": "AUTHORITATIVE, 2026-09-21: fetched from the MANUFACTURER's own host, not from a mirror.  pan.jczn1688.com serves /api/manifest/<path> plus content-addressed shards at /s/<sha256>, so the download is self-verifying; fetch_docs.sh checks every shard hash and refuses to assemble on a mismatch.  Held at w3_pio/boards/docs/aitrip-s3-n16r8/ (37 files, sha256 each in MANIFEST.tsv).  || A PRIOR VERSION OF THIS FIELD CLAIMED THE GITHUB MIRROR WAS 'BYTE-IDENTICAL' TO THE FACTORY ARCHIVE.  THAT WAS ASSERTED, NEVER CHECKED, AND IS FALSE.  Diffed 2026-09-21: 18 binaries identical, but 4 of 22 text files differ (sizes consistent with CRLF->LF in transit), the mirror is an OLDER REVISION missing 86Switch_onoff_v1.3.bin and JC4848W540C_I_W-V2.1-NEWUI.bin, and -- the expensive part -- THE MIRROR HAS NO SCHEMATIC.  Jingcai ships a 2-sheet circuit diagram as 5-IO pin distribution/1.png and 2.png; no GitHub copy carries it, and on its strength three fields in THIS FILE were corrected (panel reset, SD MISO, audio/relay).  See vendor/5-IO_pin_distribution/SCHEMATIC_FINDINGS.md.  || THE GENERAL LESSON: a mirror can be trusted but not CHECKED; a content-addressed original can be checked.  Prefer the source that can prove itself, and when you write 'identical', diff it first.  || STILL NOT MEASURED: nothing has been flashed to this board and no pixel has been lit.  Four independent sources now agree on the GPIO assignment, which is not the same as the panel lighting up."
+}
